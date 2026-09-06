@@ -45,6 +45,9 @@ export default function Home() {
   const [createError, setCreateError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createForm, setCreateForm] = useState({ title: "", origin: "", destinationCountry: "", destination: "", startDate: "", endDate: "" });
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [searchForm, setSearchForm] = useState({ origin: "Москва", destination: "Бангкок", startDate: "2026-12-03", endDate: "2026-12-15", guests: "4" });
 
   useEffect(() => {
     let active = true;
@@ -83,6 +86,26 @@ export default function Home() {
     setItems((current) => current.map((candidate) => candidate.id === id ? { ...candidate, status: nextStatus } : candidate));
     if (activeTripId !== "thailand" && activeTripId !== "istanbul") {
       fetch(`/api/trips/${activeTripId}/plan-items/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: nextStatus }) }).catch(() => undefined);
+    }
+  }
+
+  async function searchOptions() {
+    setSearchError("");
+    setIsSearching(true);
+    try {
+      const query = new URLSearchParams({ category: activeTab, ...searchForm });
+      const response = await fetch(`/api/search?${query.toString()}`);
+      const payload = await response.json() as { results?: Array<{ id: string; category: TripTab; title: string; subtitle: string; details: string; source: string; price: number; icon: string; tint: string }>; error?: string };
+      if (!response.ok) {
+        setSearchError(payload.error ?? "Не удалось выполнить поиск.");
+        return;
+      }
+      setItems((payload.results ?? []).map((item) => ({ ...item, status: "wishlist" as PlanStatus })));
+      setStatusFilter("all");
+    } catch {
+      setSearchError("Не удалось связаться с сервисом поиска.");
+    } finally {
+      setIsSearching(false);
     }
   }
 
@@ -129,6 +152,7 @@ export default function Home() {
           <div className="workspace-main">
             <nav className="tabs" aria-label="Разделы поездки">{tabs.map((tab) => <button className={activeTab === tab.id ? "active" : ""} key={tab.id} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}</nav>
             <div className="section-toolbar"><div><h2>{tabs.find((tab) => tab.id === activeTab)?.label}</h2><p>{activeTab === "transport" ? "Варианты пути с актуальными ценами" : "Собирайте идеи и добавляйте лучшее в план"}</p></div><button className="secondary-button">＋ Добавить ссылку</button></div>
+            <div className="search-panel"><div className="search-panel-heading"><div><strong>Найти варианты</strong><span>Единый поиск по поставщикам</span></div><span className="search-provider">{isSearching ? "Ищем…" : "Демо-провайдеры"}</span></div><div className="search-fields"><label>Откуда<input value={searchForm.origin} onChange={(event) => setSearchForm({ ...searchForm, origin: event.target.value })} /></label><label>Куда<input value={searchForm.destination} onChange={(event) => setSearchForm({ ...searchForm, destination: event.target.value })} /></label><label>Начало<input type="date" value={searchForm.startDate} onChange={(event) => setSearchForm({ ...searchForm, startDate: event.target.value })} /></label><label>Конец<input type="date" value={searchForm.endDate} onChange={(event) => setSearchForm({ ...searchForm, endDate: event.target.value })} /></label><label>Людей<input type="number" min="1" max="20" value={searchForm.guests} onChange={(event) => setSearchForm({ ...searchForm, guests: event.target.value })} /></label><button className="primary-button search-button" onClick={searchOptions} disabled={isSearching}>{isSearching ? "Ищем…" : "Найти варианты"}</button></div>{searchError && <p className="search-error" role="alert">{searchError}</p>}</div>
             <div className="filters">{statuses.map((status) => <button className={statusFilter === status.id ? "filter-active" : ""} key={status.id} onClick={() => setStatusFilter(status.id)}>{status.label}</button>)}<span /><button>↕ Сортировка</button></div>
             <div className="cards">{filteredItems.length ? filteredItems.map((item) => <article className="item-card" key={item.id}><div className={`item-icon ${item.tint}`}>{item.icon}</div><div className="item-content"><div className="item-heading"><div><h3>{item.title}</h3><p>{item.subtitle}</p></div><button className={`status ${item.status}`} onClick={() => toggleStatus(item.id)} title="Изменить статус">{statusLabels[item.status]}</button></div><div className="item-meta"><span>{item.details}</span><span className="source">Источник: {item.source}</span></div></div><div className="item-price">{item.price ? rubles.format(item.price) : "Бесплатно"}<small>{item.price ? "за всех участников" : ""}</small></div><button className="card-more" aria-label="Действия">•••</button></article>) : <div className="empty-state"><span>⌁</span><h3>Варианты не найдены</h3><p>Попробуйте изменить фильтр или добавьте вариант по ссылке.</p></div>}</div>
           </div>
