@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+.agents/
+.supabase/
+supabase/.temp/
+.env*
+!.env.example
+*.log
+.DS_Store
