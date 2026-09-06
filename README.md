@@ -26,6 +26,9 @@
 - `proxy.ts` обновляет Supabase-сессию для серверных запросов.
 - `/api/trips/[tripId]/plan-items` читает и добавляет варианты в план поездки;
 - `/api/trips/[tripId]/plan-items/[itemId]` обновляет статус или данные варианта.
+- `/api/search` использует server-only провайдеры: при наличии `TRAVELPAYOUTS_API_TOKEN` выполняет реальный запрос Aviasales Data API для билетов;
+- при отсутствии ключа реальный поиск возвращает понятный статус `provider_not_configured`, а демо-данные включаются только через `SEARCH_USE_DEMO=true`;
+- для других категорий добавляются отдельные провайдеры без изменения общего формата карточек.
 
 Миграция применена к проекту Supabase через SQL Editor. Для синхронизации с Supabase CLI потребуется выполнить `supabase migration repair` после авторизации CLI.
 

@@ -5,6 +5,7 @@ const result = (params: SearchParams, values: Omit<SearchResult, "category" | "u
   category: params.category,
   updatedAt: new Date().toISOString(),
   isDemo: true,
+  availabilityStatus: "unknown",
 });
 
 export async function searchDemoProviders(params: SearchParams): Promise<SearchResult[]> {

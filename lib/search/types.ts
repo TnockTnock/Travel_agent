@@ -17,6 +17,8 @@ export type SearchResult = {
   details: string;
   source: string;
   sourceUrl?: string;
+  provider?: string;
+  availabilityStatus?: "live" | "cached" | "unknown";
   price: number;
   currency: string;
   icon: string;

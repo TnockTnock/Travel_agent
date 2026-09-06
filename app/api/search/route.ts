@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { TripTab } from "@/lib/types";
 import { searchDemoProviders } from "@/lib/search/demo-providers";
+import { aviasalesConfigured, searchAviasales } from "@/lib/search/aviasales";
 import type { SearchParams } from "@/lib/search/types";
 
 const categories: TripTab[] = ["transport", "stays", "events", "places", "next"];
@@ -18,6 +19,18 @@ export async function GET(request: Request) {
   if (!Number.isInteger(guests) || guests < 1 || guests > 20) return NextResponse.json({ error: "Количество путешественников должно быть от 1 до 20." }, { status: 400 });
 
   const params: SearchParams = { category, origin, destination, startDate, endDate, guests };
-  const results = await searchDemoProviders(params);
-  return NextResponse.json({ results, meta: { providerMode: "demo", checkedAt: new Date().toISOString(), message: "Демонстрационные результаты. Перед бронированием цена проверяется у поставщика." } });
+  try {
+    if (category === "transport" && aviasalesConfigured()) {
+      const results = await searchAviasales(params);
+      return NextResponse.json({ results, meta: { providerMode: "live", checkedAt: new Date().toISOString(), message: "Цены получены из Aviasales Data API и требуют подтверждения у поставщика." } });
+    }
+    if (process.env.SEARCH_USE_DEMO === "true") {
+      const results = await searchDemoProviders(params);
+      return NextResponse.json({ results, meta: { providerMode: "demo", checkedAt: new Date().toISOString(), message: "Демонстрационные результаты включены только для разработки." } });
+    }
+    return NextResponse.json({ error: "Реальный провайдер для этой категории пока не подключён.", code: "provider_not_configured" }, { status: 503 });
+  } catch (error) {
+    console.error("Search provider failed", error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Провайдер поиска временно недоступен.", code: "provider_error" }, { status: 502 });
+  }
 }

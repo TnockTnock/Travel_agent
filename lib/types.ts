@@ -8,6 +8,7 @@ export type TripItem = {
   subtitle: string;
   details: string;
   source: string;
+  sourceUrl?: string;
   price: number;
   status: PlanStatus;
   icon: string;
