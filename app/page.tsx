@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { trips, tripItems as initialItems } from "@/lib/demo-data";
-import type { PlanStatus, TripTab } from "@/lib/types";
+import type { PlanStatus, TripItem, TripTab } from "@/lib/types";
 
 const tabs: Array<{ id: TripTab; label: string }> = [
   { id: "transport", label: "Как добраться" },
@@ -22,6 +22,17 @@ const statuses: Array<{ id: PlanStatus | "all"; label: string }> = [
 
 const statusLabels: Record<PlanStatus, string> = { wishlist: "Вишлист", approved: "Согласовано", booked: "Забронировано", recheck: "Нужно перепроверить" };
 const rubles = new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 0 });
+
+function mapPlanItem(item: { id: string; category: TripTab; title: string; subtitle: string | null; details: string | null; source_name: string | null; price_amount: number | null; status: PlanStatus }): TripItem {
+  const visualByCategory: Record<TripTab, { icon: string; tint: string }> = {
+    transport: { icon: "✈", tint: "blue" },
+    stays: { icon: "⌂", tint: "violet" },
+    events: { icon: "✦", tint: "orange" },
+    places: { icon: "⌖", tint: "green" },
+    next: { icon: "→", tint: "blue" },
+  };
+  return { ...item, subtitle: item.subtitle ?? "", details: item.details ?? "", source: item.source_name ?? "Вручную", price: item.price_amount ?? 0, ...visualByCategory[item.category] };
+}
 
 export default function Home() {
   const [tripList, setTripList] = useState(trips);
@@ -53,12 +64,26 @@ export default function Home() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (activeTripId === "thailand" || activeTripId === "istanbul") return;
+    fetch(`/api/trips/${activeTripId}/plan-items`)
+      .then(async (response) => response.ok ? await response.json() as { items?: Array<{ id: string; category: TripTab; title: string; subtitle: string | null; details: string | null; source_name: string | null; price_amount: number | null; status: PlanStatus }> } : null)
+      .then((payload) => { if (payload?.items) setItems(payload.items.map(mapPlanItem)); })
+      .catch(() => undefined);
+  }, [activeTripId]);
+
   const trip = tripList.find((item) => item.id === activeTripId) ?? tripList[0];
   const filteredItems = useMemo(() => items.filter((item) => item.category === activeTab && (statusFilter === "all" || item.status === statusFilter)), [activeTab, items, statusFilter]);
   const total = items.filter((item) => item.status === "approved" || item.status === "booked").reduce((sum, item) => sum + item.price, 0);
 
   function toggleStatus(id: string) {
-    setItems((current) => current.map((item) => item.id === id ? { ...item, status: item.status === "wishlist" ? "approved" : item.status === "approved" ? "booked" : "wishlist" } : item));
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item) return;
+    const nextStatus = item.status === "wishlist" ? "approved" : item.status === "approved" ? "booked" : "wishlist";
+    setItems((current) => current.map((candidate) => candidate.id === id ? { ...candidate, status: nextStatus } : candidate));
+    if (activeTripId !== "thailand" && activeTripId !== "istanbul") {
+      fetch(`/api/trips/${activeTripId}/plan-items/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: nextStatus }) }).catch(() => undefined);
+    }
   }
 
   async function createTrip(event: FormEvent<HTMLFormElement>) {
@@ -75,6 +100,7 @@ export default function Home() {
       const createdTrip = { id: payload.trip.id, title: payload.trip.title, origin: payload.trip.origin, destination: payload.trip.destination, dates: `${payload.trip.start_date} — ${payload.trip.end_date}`, members: 1, cover: "✦" };
       setTripList((current) => [createdTrip, ...current]);
       setActiveTripId(createdTrip.id);
+      setItems([]);
       setShowCreate(false);
       setCreateForm({ title: "", origin: "", destinationCountry: "", destination: "", startDate: "", endDate: "" });
     } catch {
